@@ -1,37 +1,82 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField] private float jumpForce;
+    // Reference Variables
+    private PlayerInput playerInput;
+    private CharacterController characterController;
 
-    private Rigidbody rb;
-    private Vector3 velocity;
-    private bool jump;
+    // Player Input Values
+    private Vector2 currentMovementInput;
+    private Vector3 currentMovement;
+    private Vector3 currentRunMovement;
+    private bool isMovementPressed;
+    private bool isRunPressed;
+    [SerializeField] private float walkSpeed = 5f;
+    [SerializeField] private float runSpeed = 7f;
 
-    private void Start()
+    private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
+        // Set Reference Variables
+        playerInput = new PlayerInput();
+        characterController = GetComponent<CharacterController>();
+
+        playerInput.CharacterControls.Move.started += OnMovementInput;
+        playerInput.CharacterControls.Move.canceled += OnMovementInput;
+        playerInput.CharacterControls.Move.performed += OnMovementInput;
+        playerInput.CharacterControls.Run.started += OnRun;
+        playerInput.CharacterControls.Run.canceled += OnRun;
     }
 
-    public void Move(Vector3 _velocity)
+    private void OnMovementInput(InputAction.CallbackContext context)
     {
-        velocity = _velocity;
+        currentMovementInput = context.ReadValue<Vector2>();
+        currentMovement.x = currentMovementInput.x * walkSpeed;
+        currentMovement.y = 0;
+        currentMovement.z = 0;
+        currentRunMovement.x = currentMovementInput.x * runSpeed;
+        currentRunMovement.y = 0;
+        currentRunMovement.z = 0;
+        isMovementPressed = currentMovementInput.x != 0 || currentMovementInput.y != 0;
     }
 
-    public void Jump()
+    private void OnRun(InputAction.CallbackContext context)
     {
-        jump = true;
+        isRunPressed = context.ReadValueAsButton();
     }
 
-    private void FixedUpdate()
+    private void HandleGravity()
     {
-        rb.MovePosition(rb.position + velocity * Time.fixedDeltaTime);
-        if (jump)
+        if (characterController.isGrounded)
         {
-            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-            jump = false;
+            float groundedGravity = -.05f;
+            currentMovement.y = groundedGravity;
+            currentRunMovement.y = groundedGravity;
+        } else
+        {
+            float gravity = -9.81f;
+            currentMovement.y = gravity;
+            currentRunMovement.y = gravity;
         }
+    }
+
+    private void Update()
+    {
+        HandleGravity();
+
+        characterController.Move((isRunPressed ? currentRunMovement : currentMovement) * Time.deltaTime);
+    }
+
+    private void OnEnable()
+    {
+        playerInput.CharacterControls.Enable();
+    }
+
+    private void OnDisable()
+    {
+        playerInput.CharacterControls.Disable();
     }
 }
